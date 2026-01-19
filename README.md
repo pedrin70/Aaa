@@ -1,55 +1,67 @@
-local TARGET_NAME = "babriel8080"
-local ITEM_NAME = "radioative coin"
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Aguarda o jogador entrar
-local player = game.Players:FindFirstChild(TARGET_NAME) or game.Players.PlayerAdded:Wait()
-if player.Name ~= TARGET_NAME then return end
+-- Pega o jogador local de forma automática (funciona para quem executar)
+local player = Players.LocalPlayer or Players.PlayerAdded:Wait()
 
--- Garante que o evento exista
-local event = game.ReplicatedStorage:FindFirstChild("TeleportCoinsEvent")
+-- Nome da moeda exatamente como está no mapa
+local ITEM_NAME = "radioative coin" 
+
+-- 1. CRIAÇÃO DO EVENTO (Lado do Servidor/Cliente)
+local event = ReplicatedStorage:FindFirstChild("TeleportCoinsEvent")
 if not event then
-    event = Instance.new("RemoteEvent", game.ReplicatedStorage)
+    event = Instance.new("RemoteEvent", ReplicatedStorage)
     event.Name = "TeleportCoinsEvent"
 end
 
--- Lógica do Servidor (Só roda uma vez)
-if game:GetService("RunService"):IsServer() then
+-- 2. LÓGICA DE TELEPORTE (Rodando no Servidor)
+-- Nota: Em alguns executores de celular, o OnServerEvent precisa ser definido assim:
+if game:GetService("RunService"):IsServer() or not game.Loaded then
     event.OnServerEvent:Connect(function(p)
-        if p.Name == TARGET_NAME then
-            local count = 0
+        -- Segurança básica: só você (ou admins)
+        if p.Name == "babriel8080" then 
+            local char = p.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+            
+            local pos = char.HumanoidRootPart.CFrame
             for _, item in pairs(workspace:GetDescendants()) do
                 if item.Name == ITEM_NAME then
                     if item:IsA("BasePart") then
-                        item.CFrame = p.Character.HumanoidRootPart.CFrame + Vector3.new(0,3,0)
-                        count = + 1
+                        item.CFrame = pos + Vector3.new(0, 3, 0)
                     elseif item:IsA("Model") then
-                        item:MoveTo(p.Character.HumanoidRootPart.Position)
-                        count = + 1
+                        item:MoveTo(char.HumanoidRootPart.Position)
                     end
                 end
             end
-            print("Puxou " .. count .. " moedas.")
         end
     end)
 end
 
--- Cria a interface (GUI)
-local function createGui()
-    local sg = Instance.new("ScreenGui")
-    sg.Name = "AdminMenu"
-    sg.Parent = player:WaitForChild("PlayerGui")
-    sg.ResetOnSpawn = false
+-- 3. INTERFACE (GUI)
+-- Remove menu antigo se existir para não acumular
+local oldGui = player.PlayerGui:FindFirstChild("AdminMenu")
+if oldGui then oldGui:Destroy() end
 
-    local btn = Instance.new("TextButton", sg)
-    btn.Size = UDim2.new(0, 200, 0, 50)
-    btn.Position = UDim2.new(0.5, -100, 0.8, 0)
-    btn.Text = "Puxar Radioative Coins"
-    btn.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
-    btn.ZIndex = 10 -- Garante que fique na frente de tudo
+local sg = Instance.new("ScreenGui", player.PlayerGui)
+sg.Name = "AdminMenu"
+sg.ResetOnSpawn = false
 
-    btn.MouseButton1Click:Connect(function()
-        event:FireServer()
-    end)
-end
+local btn = Instance.new("TextButton", sg)
+btn.Size = UDim2.new(0, 180, 0, 45)
+btn.Position = UDim2.new(0.5, -90, 0.2, 0) -- Perto do topo para não atrapalhar o analógico
+btn.Text = "Puxar Moedas"
+btn.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.SourceSansBold
+btn.TextSize = 18
 
-createGui()
+-- Arredondar cantos (fica mais bonito no celular)
+local corner = Instance.new("UICorner", btn)
+corner.CornerRadius = UDim.new(0, 10)
+
+btn.MouseButton1Click:Connect(function()
+    event:FireServer()
+    btn.Text = "Enviado!"
+    task.wait(1)
+    btn.Text = "Puxar Moedas"
+end)
