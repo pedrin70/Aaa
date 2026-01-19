@@ -1,53 +1,229 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
+local runService = game:GetService("RunService")
 
--- Função para criar a interface
-local function criarMenu()
-    -- Deleta menus antigos para não bugar
-    if player.PlayerGui:FindFirstChild("AdminMenu") then
-        player.PlayerGui.AdminMenu:Destroy()
+local autoFarmActive = false
+local antiAfkActive = false
+local flyActive = false
+local flySpeed = 50 
+local itemName = "Radioactive Coin"
+
+local function startFly()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart")
+    local hum = char:WaitForChild("Humanoid")
+    
+    for _, v in pairs(hrp:GetChildren()) do
+        if v.Name == "IYFlyVelocity" or v.Name == "IYFlyGyro" then v:Destroy() end
     end
 
-    local sg = Instance.new("ScreenGui", player.PlayerGui)
-    sg.Name = "AdminMenu"
-    sg.ResetOnSpawn = false
+    local velocity = Instance.new("BodyVelocity")
+    velocity.Name = "IYFlyVelocity"
+    velocity.Parent = hrp
+    velocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    velocity.Velocity = Vector3.new(0, 0, 0)
 
-    local btn = Instance.new("TextButton", sg)
-    btn.Size = UDim2.new(0, 200, 0, 60)
-    btn.Position = UDim2.new(0.5, -100, 0.4, 0) -- Meio da tela para você ver fácil
-    btn.Text = "PUXAR MOEDAS AGORA"
-    btn.BackgroundColor3 = Color3.fromRGB(255, 85, 0) -- Cor Laranja forte
-    btn.TextColor3 = Color3.new(1, 1, 1)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 20
-    btn.Active = true
-    btn.Draggable = true -- Você pode arrastar ele se atrapalhar
+    local gyro = Instance.new("BodyGyro")
+    gyro.Name = "IYFlyGyro"
+    gyro.Parent = hrp
+    gyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    gyro.CFrame = hrp.CFrame
 
-    -- Lógica de Teleporte Direta
-    btn.MouseButton1Click:Connect(function()
-        local count = 0
-        local character = player.Character
-        if character and character:FindFirstChild("HumanoidRootPart") then
-            local myPos = character.HumanoidRootPart.CFrame
+    hum.PlatformStand = true 
+
+    task.spawn(function()
+        while flyActive and char.Parent do
+            local camera = workspace.CurrentCamera
+            local moveDir = hum.MoveDirection
             
-            for _, item in pairs(workspace:GetDescendants()) do
-                if item.Name == "radioative coin" then
-                    if item:IsA("BasePart") then
-                        item.CFrame = myPos + Vector3.new(0, 3, 0)
-                        count = count + 1
-                    elseif item:IsA("Model") then
-                        item:MoveTo(character.HumanoidRootPart.Position)
-                        count = count + 1
-                    end
-                end
+            if moveDir.Magnitude > 0 then
+                velocity.Velocity = camera.CFrame.LookVector * flySpeed
+            else
+                velocity.Velocity = Vector3.new(0, 0, 0)
             end
-            btn.Text = "Puxou: " .. count
-            task.wait(1)
-            btn.Text = "PUXAR MOEDAS AGORA"
+            
+            gyro.CFrame = camera.CFrame
+            runService.Heartbeat:Wait()
         end
+        if velocity then velocity:Destroy() end
+        if gyro then gyro:Destroy() end
+        if hum then hum.PlatformStand = false end
     end)
 end
 
--- Executa a função
-criarMenu()
-print("Script Carregado com Sucesso!")
+-- Interface
+local function criarInterface()
+    if player.PlayerGui:FindFirstChild("VermelhoHubGui") then player.PlayerGui.VermelhoHubGui:Destroy() end
+
+    local sg = Instance.new("ScreenGui", player.PlayerGui)
+    sg.Name = "VermelhoHubGui"
+    sg.ResetOnSpawn = false
+    sg.DisplayOrder = 9999
+
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0, 420, 0, 280) -- Aumentado um pouco para caber o texto embaixo
+    main.Position = UDim2.new(0.5, -210, 0.5, -140)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    main.Active = true
+    main.Draggable = true 
+    Instance.new("UICorner", main)
+
+    local hubTitle = Instance.new("TextLabel", main)
+    hubTitle.Size = UDim2.new(1, 0, 0, 30)
+    hubTitle.Position = UDim2.new(0, 0, 1, -30)
+    hubTitle.Text = "VERMELHO HUB"
+    hubTitle.TextColor3 = Color3.fromRGB(255, 0, 0) -- Vermelho vivo
+    hubTitle.Font = Enum.Font.GothamBold
+    hubTitle.TextSize = 18
+    hubTitle.BackgroundTransparency = 1
+
+    local minBtn = Instance.new("TextButton", sg)
+    minBtn.Size = UDim2.new(0, 50, 0, 50)
+    minBtn.Position = UDim2.new(0, 10, 0.5, -25)
+    minBtn.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    minBtn.Text = "V" -- Trocado de R para V
+    minBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+    minBtn.Font = "GothamBold"
+    minBtn.TextSize = 25
+    minBtn.ZIndex = 10000
+    minBtn.Active = true
+    minBtn.Draggable = true 
+    Instance.new("UICorner", minBtn).CornerRadius = UDim.new(1, 0)
+
+    minBtn.MouseButton1Click:Connect(function()
+        main.Visible = not main.Visible
+    end)
+
+    local sidebar = Instance.new("Frame", main)
+    sidebar.Size = UDim2.new(0, 100, 1, -35) -- Espaço para o título embaixo
+    sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    Instance.new("UICorner", sidebar)
+    local sideLayout = Instance.new("UIListLayout", sidebar)
+    sideLayout.Padding = UDim.new(0, 5)
+    sideLayout.HorizontalAlignment = "Center"
+
+    local content = Instance.new("ScrollingFrame", main)
+    content.Position = UDim2.new(0, 110, 0, 10)
+    content.Size = UDim2.new(1, -120, 1, -50)
+    content.BackgroundTransparency = 1
+    content.ScrollBarThickness = 2
+    local contentLayout = Instance.new("UIListLayout", content)
+    contentLayout.Padding = UDim.new(0, 10)
+
+    local function clearContent()
+        for _, v in pairs(content:GetChildren()) do
+            if not v:IsA("UIListLayout") then v:Destroy() end
+        end
+    end
+
+    local function createToggle(text, callback, state)
+        local btn = Instance.new("TextButton", content)
+        btn.Size = UDim2.new(0.95, 0, 0, 40)
+        btn.BackgroundColor3 = state and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(35, 35, 35)
+        btn.Text = text .. (state and ": ON" or ": OFF")
+        btn.TextColor3 = Color3.new(1, 1, 1)
+        btn.Font = "Gotham"
+        Instance.new("UICorner", btn)
+        btn.MouseButton1Click:Connect(function()
+            state = not state
+            btn.Text = text .. (state and ": ON" or ": OFF")
+            btn.BackgroundColor3 = state and Color3.fromRGB(200, 0, 0) or Color3.fromRGB(35, 35, 35)
+            callback(state)
+        end)
+    end
+
+    -- Abas
+    local function addTab(name, func)
+        local b = Instance.new("TextButton", sidebar)
+        b.Size = UDim2.new(0.9, 0, 0, 35)
+        b.Text = name
+        b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        b.TextColor3 = Color3.new(1, 1, 1)
+        b.Font = "GothamBold"
+        Instance.new("UICorner", b)
+        b.MouseButton1Click:Connect(function()
+            clearContent()
+            func()
+        end)
+    end
+
+    addTab("Evento", function()
+        createToggle("Coletar Moedas", function(v) autoFarmActive = v end, autoFarmActive)
+    end)
+
+    addTab("Misc", function()
+        createToggle("Fly (IY Style)", function(v) 
+            flyActive = v 
+            if v then startFly() end
+        end, flyActive)
+        
+        local label = Instance.new("TextLabel", content)
+        label.Size = UDim2.new(0.95, 0, 0, 20)
+        label.Text = "Velocidade de:" -- Alterado conforme pedido
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.BackgroundTransparency = 1
+        label.Font = "Gotham"
+
+        local speedInput = Instance.new("TextBox", content)
+        speedInput.Size = UDim2.new(0.95, 0, 0, 35)
+        speedInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        speedInput.Text = tostring(flySpeed)
+        speedInput.TextColor3 = Color3.new(1, 1, 1)
+        speedInput.PlaceholderText = "Digite a velocidade..."
+        speedInput.Font = "Gotham"
+        Instance.new("UICorner", speedInput)
+
+        speedInput.FocusLost:Connect(function()
+            local num = tonumber(speedInput.Text)
+            if num then
+                flySpeed = num
+            else
+                speedInput.Text = tostring(flySpeed)
+            end
+        end)
+
+        createToggle("Anti-AFK", function(v) antiAfkActive = v end, antiAfkActive)
+    end)
+
+    addTab("FPS Boost", function()
+        local b = Instance.new("TextButton", content)
+        b.Size = UDim2.new(0.95, 0, 0, 40)
+        b.Text = "Ativar Anti-Lag"
+        b.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        b.TextColor3 = Color3.new(1, 1, 1)
+        Instance.new("UICorner", b)
+        b.MouseButton1Click:Connect(function()
+            for _, v in pairs(game:GetDescendants()) do
+                if v:IsA("BasePart") then v.Material = Enum.Material.SmoothPlastic
+                elseif v:IsA("Decal") then v:Destroy() end
+            end
+        end)
+    end)
+    
+    clearContent()
+    createToggle("Coletar Moedas", function(v) autoFarmActive = v end, autoFarmActive)
+end
+
+task.spawn(function()
+    while true do
+        if autoFarmActive then
+            pcall(function()
+                for _, obj in pairs(workspace:GetDescendants()) do
+                    if obj.Name == itemName and obj:IsA("BasePart") then
+                        obj.CFrame = player.Character.HumanoidRootPart.CFrame
+                    end
+                end
+            end)
+        end
+        task.wait(0.4)
+    end
+end)
+
+player.Idled:Connect(function()
+    if antiAfkActive then
+        game:GetService("VirtualUser"):CaptureController()
+        game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+    end
+end)
+
+criarInterface()
